@@ -1,21 +1,26 @@
 # Drone Upload-Picture Tracker
 
-YOLO is now a TensorRT engine instead of an ONNX file. Massive speed boost
-on Jetson — went from ~10 FPS effective to where SiamFC is now the
-bottleneck. YOLO standalone runs at 60-80 FPS now.
+SiamFC has been replaced with MobileCLIP-S0. MobileCLIP is Apple's edge-device
+CLIP variant — small (~30 MB), fast on Jetson via TensorRT, and produces 512-dim
+L2-normalized embeddings. Crucially, embedding the whole batch of candidate
+detections in a single TensorRT call is way faster than SiamFC's per-patch loop.
 
-## Building the engine (one-time)
+## Build the MobileCLIP engine (one-time)
+
+Export the model from the Apple `ml-mobileclip` package to ONNX first, then:
 
 ```bash
-yolo export model=yolov8n.pt format=engine device=0 half=True
-# produces yolov8n.engine
+trtexec --onnx=mobileclip_s0_image_encoder.onnx \
+        --saveEngine=mobileclip_s0_fp16.engine \
+        --fp16 \
+        --minShapes=images:1x3x256x256 \
+        --optShapes=images:5x3x256x256 \
+        --maxShapes=images:10x3x256x256
 ```
 
-Ultralytics auto-detects the .engine extension and uses TensorRT.
+The dynamic shapes let us pass batches of any size from 1 to 10.
 
-## How to run
-
-Same as before:
+## Run
 
 ```bash
 python3 upload_picture_tracker.py
@@ -23,18 +28,22 @@ python3 upload_picture_tracker.py
 
 ## Files needed
 
-- `yolov8n.engine` — YOLO TensorRT engine (build with the export command above)
-- `siamfc_alexnet.onnx` — SiamFC embedder
-- `target.jpg` — reference image
-- `test_footage.mp4` — video file
+- `yolov8n.engine` — YOLO TensorRT engine
+- `mobileclip_s0_fp16.engine` — MobileCLIP image encoder
+- `target.jpg`, `test_footage.mp4`
 
-## What changed from v0.1
+## What changed from v0.2
 
-- YOLO_MODEL_PATH points to `.engine` instead of `.onnx`
-- SKIP_FRAMES reduced from 5 to 2 (can afford more frequent rescoring)
+- SiamFC removed entirely (file deleted)
+- New `mobileclip_embedder.py` with TensorRT wrapper
+- Main script uses batched embedding (one call per frame, not one per detection)
+- Fusion weights rebalanced: embed 0.55, hist 0.30, spatial 0.15
+- Score threshold raised to 0.55 (MobileCLIP scores trend higher)
+- Histogram comparison simplified to Bhattacharyya only (chi-square and
+  correlation were redundant)
 
 ## TODO
 
-- [ ] Replace SiamFC — it's the bottleneck now, not YOLO
-- [ ] Batch the similarity computation
+- [ ] Sanity-check the FP16 engine output on real images
+- [ ] Look at confidence calibration — are similar people getting similar scores?
 - [ ] Click-track mode
