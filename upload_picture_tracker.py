@@ -31,7 +31,7 @@ import sys
 VIDEO_PATH = "test_footage.mp4"
 TARGET_IMG = "target.jpg"
 
-YOLO_MODEL_PATH = "yolov8n.onnx"
+YOLO_MODEL_PATH = "yolov8n.engine"   # TensorRT engine for 6-8x speedup over ONNX
 YOLO_CONF       = 0.30
 YOLO_TARGET_CLS = 0   # 0 = person
 
@@ -51,7 +51,7 @@ LOST_FRAMES_THRESHOLD   = 8
 SCORE_THRESHOLD         = 0.45
 
 # Skip-frame
-SKIP_FRAMES = 5
+SKIP_FRAMES = 2   # was 5 — can afford more frequent rescore now that YOLO is fast
 
 
 # ============================================================================

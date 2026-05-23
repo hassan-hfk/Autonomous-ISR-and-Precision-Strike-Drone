@@ -1,45 +1,40 @@
 # Drone Upload-Picture Tracker
 
-First working version of the upload-picture tracker.
+YOLO is now a TensorRT engine instead of an ONNX file. Massive speed boost
+on Jetson — went from ~10 FPS effective to where SiamFC is now the
+bottleneck. YOLO standalone runs at 60-80 FPS now.
 
-## What it does
+## Building the engine (one-time)
 
-Given:
-- A reference image of a target (`target.jpg`)
-- A video stream (`test_footage.mp4`)
+```bash
+yolo export model=yolov8n.pt format=engine device=0 half=True
+# produces yolov8n.engine
+```
 
-It detects every object of the target class in each frame using YOLOv8n,
-scores how similar each detection is to the reference image using a
-combination of SiamFC features, HSV color histograms, spatial coherence,
-and temporal smoothness, and locks onto the track ID that scores
-consistently above threshold for several frames in a row.
+Ultralytics auto-detects the .engine extension and uses TensorRT.
 
 ## How to run
 
+Same as before:
+
 ```bash
-pip install ultralytics opencv-python onnxruntime-gpu numpy
 python3 upload_picture_tracker.py
 ```
 
-Press `q` to quit.
+## Files needed
 
-## Files needed in the same folder
-
-- `yolov8n.onnx` — YOLO model (ONNX format)
+- `yolov8n.engine` — YOLO TensorRT engine (build with the export command above)
 - `siamfc_alexnet.onnx` — SiamFC embedder
-- `target.jpg` — reference image of the target
-- `test_footage.mp4` — video file to process
+- `target.jpg` — reference image
+- `test_footage.mp4` — video file
 
-## Known limitations
+## What changed from v0.1
 
-- Effective rate is about 5-10 FPS — YOLO via ONNX runtime is slow on Jetson
-- SiamFC is run patch-by-patch with no batching
-- Three histogram comparison methods are averaged (probably overkill)
-- Hard-coded paths and config (refactor later)
+- YOLO_MODEL_PATH points to `.engine` instead of `.onnx`
+- SKIP_FRAMES reduced from 5 to 2 (can afford more frequent rescoring)
 
 ## TODO
 
-- [ ] Export YOLO to TensorRT engine for speed
-- [ ] Batch SiamFC inferences
-- [ ] Move config to a separate file
-- [ ] Click-track mode (in-flight click on arbitrary object)
+- [ ] Replace SiamFC — it's the bottleneck now, not YOLO
+- [ ] Batch the similarity computation
+- [ ] Click-track mode
